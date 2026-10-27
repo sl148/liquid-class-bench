@@ -1,0 +1,1135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Simulated air-displacement pipette: watch a transfer, see where volume is lost, and search for fast, accurate liquid classes.">
+<title>Liquid Class Bench</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: full-screen instrument console. Sidebar holds the liquid class; main area is tabbed. */
+:root {
+  --bg: #eef1f4; --panel: #ffffff; --ink: #14202b; --ink-2: #4a5866; --ink-3: #7c8996;
+  --line: #d9dfe5; --band: #f3f5f8; --accent: #1c5cab; --accent-soft: #e3edf9;
+  --series-1: #2a78d6; --good: #0b7d0b; --warn: #a86a00; --bad: #c33232;
+  --f-display: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1419; --panel: #171e25; --ink: #e6ebf0; --ink-2: #a7b3bf; --ink-3: #74818e;
+    --line: #2a343e; --band: #1c242c; --accent: #6da7ec; --accent-soft: #1d3047;
+    --series-1: #3987e5; --good: #3fbf4a; --warn: #e0a42e; --bad: #ec6b6b; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1419; --panel: #171e25; --ink: #e6ebf0; --ink-2: #a7b3bf; --ink-3: #74818e;
+  --line: #2a343e; --band: #1c242c; --accent: #6da7ec; --accent-soft: #1d3047;
+  --series-1: #3987e5; --good: #3fbf4a; --warn: #e0a42e; --bad: #ec6b6b; color-scheme: dark;
+}
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 14px; }
+.app { height: 100%; display: grid; grid-template-rows: auto 1fr; }
+.top {
+  display: flex; align-items: center; gap: 24px; flex-wrap: wrap;
+  padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  border-bottom: 1px solid var(--line); background: var(--panel);
+}
+.brand { font-family: var(--f-display); font-weight: 600; font-size: 19px; letter-spacing: 0.01em; }
+.brand small { font-family: var(--f-body); font-weight: 400; font-size: 12px; color: var(--ink-3); margin-left: 8px; letter-spacing: 0; }
+.tabs { display: flex; gap: 4px; }
+.tab {
+  font: 500 13px var(--f-body); color: var(--ink-2); background: none; border: 1px solid transparent;
+  padding: 6px 12px; border-radius: 6px; cursor: pointer;
+}
+.tab[aria-selected="true"] { color: var(--accent); background: var(--accent-soft); }
+.gbtn {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 6px;
+  font: 500 13px var(--f-body); color: var(--ink-2); background: none; border: 1px solid var(--line);
+  padding: 5px 12px 5px 6px; border-radius: 99px; cursor: pointer;
+}
+.gbtn b { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--ink-3); color: var(--panel); font: 600 11px var(--f-body); }
+.gbtn[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.gbtn[aria-pressed="true"] b { background: var(--accent); }
+/* Guide notes: hidden unless guide mode is on */
+.gd { display: none; font-size: 12px; line-height: 1.45; color: var(--ink-2); margin: 0; }
+.guide .gd { display: block; }
+.gd-n { margin: 6px 14px 0; padding: 6px 10px; background: var(--accent-soft); border-radius: 6px; color: var(--ink); }
+.side .gd { margin: -2px 0 8px; color: var(--ink-3); }
+.tile .gd { margin-top: 4px; color: var(--ink-3); }
+.cap { padding: 8px 12px; border-top: 1px solid var(--line); min-height: 3.2em; }
+.cap b { color: var(--ink); }
+.bk .ds { grid-column: 1 / -1; margin: -3px 0 3px; color: var(--ink-3); font-size: 12px; }
+.pick .gd { flex-basis: 100%; }
+.tab:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.body { min-height: 0; display: grid; grid-template-columns: 268px 1fr; }
+.body.full { grid-template-columns: 1fr; }
+.body.full .side { display: none; }
+.side {
+  min-height: 0; overflow-y: auto; border-right: 1px solid var(--line); background: var(--panel);
+  padding: 14px 16px 20px; display: flex; flex-direction: column; gap: 18px;
+}
+.grp h3 {
+  margin: 0 0 8px; font: 600 11px var(--f-body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3);
+}
+.liqs { display: flex; flex-direction: column; gap: 2px; }
+.liq {
+  display: grid; grid-template-columns: 12px 1fr auto; align-items: center; gap: 10px;
+  padding: 6px 8px; border-radius: 6px; cursor: pointer; border: 1px solid transparent;
+}
+.liq input { position: absolute; opacity: 0; pointer-events: none; }
+.liq .sw { width: 12px; height: 12px; border-radius: 3px; }
+.liq .nm { font-weight: 500; }
+.liq .pr { font: 400 11px var(--f-mono); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.liq:has(input:checked) { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
+.liq:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 1px; }
+.ctl { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; margin-bottom: 8px; }
+.ctl label { color: var(--ink-2); font-size: 13px; }
+.ctl output { font: 500 12px var(--f-mono); font-variant-numeric: tabular-nums; }
+.ctl input { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); margin: 2px 0 0; }
+main { min-height: 0; min-width: 0; overflow: auto; }
+.view { height: 100%; box-sizing: border-box; padding: 14px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+.card-h { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 10px 14px 0; flex-wrap: wrap; }
+.card-h h2 { margin: 0; font: 600 13px var(--f-body); }
+.card-h span { color: var(--ink-3); font-size: 12px; }
+/* Simulate */
+#v-sim { display: grid; grid-template-columns: minmax(250px, 320px) 1fr; gap: 14px; }
+#v-sim[hidden] { display: none; }
+.scene { position: relative; display: flex; flex-direction: column; min-height: 420px; }
+.scene canvas { flex: 1; width: 100%; min-height: 0; display: block; }
+.scene-bar { display: flex; align-items: center; gap: 10px; padding: 8px 12px 10px; border-top: 1px solid var(--line); }
+.btn {
+  font: 500 13px var(--f-body); color: var(--panel); background: var(--accent); border: 0;
+  padding: 6px 14px; border-radius: 6px; cursor: pointer;
+}
+.btn.ghost { color: var(--accent); background: var(--accent-soft); }
+.scene-bar .meta { font: 12px var(--f-mono); color: var(--ink-3); font-variant-numeric: tabular-nums; margin-left: auto; }
+.right { display: grid; grid-template-rows: auto minmax(260px, 1fr) auto; gap: 14px; min-width: 0; min-height: 0; }
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.tile { padding: 10px 14px 12px; }
+.tile .k { font-size: 12px; color: var(--ink-3); }
+.tile .v { font: 600 26px var(--f-display); font-variant-numeric: tabular-nums; margin-top: 2px; }
+.tile .v small { font: 500 13px var(--f-body); color: var(--ink-2); margin-left: 3px; }
+.tile .s { font-size: 12px; color: var(--ink-2); margin-top: 2px; }
+.chip { display: inline-flex; align-items: center; gap: 5px; font: 600 11px var(--f-body); padding: 2px 7px; border-radius: 99px; border: 1px solid currentColor; }
+.chip.good { color: var(--good); } .chip.warn { color: var(--warn); } .chip.bad { color: var(--bad); }
+.traces { display: flex; flex-direction: column; min-height: 0; }
+.traces canvas { flex: 1; width: 100%; min-height: 220px; display: block; cursor: crosshair; touch-action: none; }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--ink-2); }
+.legend i { display: inline-block; width: 14px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 5px; }
+.legend i.dash { border-top-style: dashed; }
+.legend i.dot { width: 8px; height: 8px; border: 0; border-radius: 50%; }
+.legend i.ring { width: 7px; height: 7px; border: 2px solid; border-radius: 50%; }
+.bk { padding: 4px 14px 12px; display: grid; grid-template-columns: auto 1fr auto; gap: 5px 12px; align-items: center; }
+.bk .lb { font-size: 13px; color: var(--ink); white-space: nowrap; }
+.bk .lb.zero, .bk .vl.zero { color: var(--ink-3); }
+.bk .bar { height: 8px; background: var(--band); border-radius: 4px; overflow: hidden; }
+.bk .bar b { display: block; height: 100%; border-radius: 4px; background: var(--ink-2); }
+.bk .bar b.gain { background: var(--series-1); }
+.bk .vl { font: 500 12px var(--f-mono); text-align: right; font-variant-numeric: tabular-nums; }
+.bk .tot { font-weight: 600; border-top: 1px solid var(--line); padding-top: 6px; }
+/* Optimize */
+#v-opt { display: grid; grid-template-rows: auto 1fr; gap: 14px; }
+#v-opt[hidden] { display: none; }
+.pick { display: flex; align-items: center; gap: 14px; padding: 12px 14px; flex-wrap: wrap; }
+.pick select { font: 500 13px var(--f-body); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }
+.pick .res { font: 13px var(--f-body); color: var(--ink-2); min-width: 0; flex: 1 1 320px; }
+.pick .res b { color: var(--ink); font-weight: 600; }
+.pick .res code { font: 12px var(--f-mono); }
+.pick .st { font: 12px var(--f-mono); color: var(--ink-3); }
+.opt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; min-height: 0; }
+.opt-grid .card { display: flex; flex-direction: column; min-height: 340px; }
+.opt-grid canvas { flex: 1; width: 100%; min-height: 0; display: block; cursor: pointer; }
+.card-f { padding: 0 14px 10px; }
+/* Model */
+#v-model { overflow-y: auto; }
+.doc { max-width: 760px; margin: 0 auto; padding: 8px 4px 40px; line-height: 1.55; }
+.doc h2 { font: 600 22px var(--f-display); margin: 8px 0 6px; text-wrap: balance; }
+.doc h3 { font: 600 14px var(--f-body); margin: 22px 0 6px; }
+.doc p { margin: 6px 0; color: var(--ink-2); max-width: 66ch; }
+.eq { font: 13px var(--f-mono); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; overflow-x: auto; white-space: pre; color: var(--ink); }
+.tbl { overflow-x: auto; }
+.doc table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.doc th, .doc td { text-align: left; padding: 7px 10px 7px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.doc th { font-weight: 600; color: var(--ink-3); font-size: 12px; }
+.doc td:first-child { white-space: nowrap; font-weight: 500; }
+.doc a { color: var(--accent); }
+@media (max-width: 1100px) {
+  #v-sim { grid-template-columns: 1fr; }
+  .scene { min-height: 400px; }
+  .opt-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+  .app { height: auto; }
+  html, body { height: auto; }
+  .body { grid-template-columns: 1fr; }
+  .side { border-right: 0; border-bottom: 1px solid var(--line); }
+  main { overflow: visible; }
+  .view { height: auto; }
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bk .lb { white-space: normal; }
+}
+</style>
+
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">Liquid Class Bench<small>P200 air-displacement channel, simulated</small></div>
+    <nav class="tabs" role="tablist">
+      <button class="tab" role="tab" id="t-sim" aria-selected="true">Simulate</button>
+      <button class="tab" role="tab" id="t-opt" aria-selected="false">Optimize</button>
+      <button class="tab" role="tab" id="t-model" aria-selected="false">Model</button>
+    </nav>
+    <button class="gbtn" id="guide" aria-pressed="false" title="Explain what each panel shows"><b>?</b>Guide</button>
+  </header>
+  <div class="body" id="body">
+    <aside class="side" id="side">
+      <div class="grp"><h3>Liquid</h3><p class="gd">Higher viscosity (cP) means the liquid follows the piston more slowly.</p><div class="liqs" id="liqs"></div></div>
+      <div class="grp"><h3>Transfer</h3><div id="g-transfer"></div></div>
+      <div class="grp"><h3>Aspirate</h3><p class="gd">Piston pulls air and liquid follows with a lag. The delay lets it catch up before the tip leaves.</p><div id="g-Aspirate"></div></div>
+      <div class="grp"><h3>Dispense</h3><p class="gd">Fast gives a clean jet but can strip a film onto the wall. The delay lets that film drain.</p><div id="g-Dispense"></div></div>
+      <div class="grp"><h3>Blowout</h3><p class="gd">Extra air pushed after the liquid to knock off the last drop.</p><div id="g-Blowout"></div></div>
+    </aside>
+    <main>
+      <section class="view" id="v-sim">
+        <div class="card scene">
+          <canvas id="cv-scene" aria-label="Animated cross-section of the pipette tip"></canvas>
+          <p class="gd cap" id="cap" aria-live="polite"></p>
+          <div class="scene-bar">
+            <button class="btn" id="play">Play</button>
+            <span class="meta" id="speed"></span>
+          </div>
+        </div>
+        <div class="right">
+          <div class="tiles">
+            <div class="card tile"><div class="k">Delivered</div><div class="v" id="o-del"></div><div class="s" id="o-del-s"></div><p class="gd">What lands in the well.</p></div>
+            <div class="card tile"><div class="k">Bias</div><div class="v" id="o-err"></div><div class="s" id="o-chip"></div><p class="gd">Average miss. Negative is short.</p></div>
+            <div class="card tile"><div class="k">CV</div><div class="v" id="o-cv"></div><div class="s">expected over repeats</div><p class="gd">Scatter between shots (estimated).</p></div>
+            <div class="card tile"><div class="k">Time</div><div class="v" id="o-time"></div><div class="s">per transfer</div><p class="gd">Aspirate through lift.</p></div>
+          </div>
+          <div class="card traces">
+            <div class="card-h"><h2>Channel pressure and tip contents</h2>
+              <div class="legend"><span><i style="color:var(--series-1)"></i>Air-gap pressure</span><span><i id="lg-liq"></i>Liquid in tip</span><span><i class="dash" style="color:var(--ink-2)"></i>Piston stroke</span></div>
+            </div>
+            <p class="gd gd-n">Top: pressure in the air gap above the liquid; below zero is suction. Bottom: the piston moves first and the liquid follows, so the gap between the lines is lag. Drag across the chart to scrub.</p>
+            <canvas id="cv-trace" aria-label="Pressure and volume traces over the transfer"></canvas>
+          </div>
+          <div class="card">
+            <div class="card-h"><h2>Where the error comes from</h2><span>µL vs target</span></div>
+            <p class="gd gd-n">Each row is one way volume goes missing. Gray bars lose volume, blue bars add it.</p>
+            <div class="bk" id="bk"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="v-opt" hidden>
+        <div class="card pick">
+          <label for="budget">Fastest setting within</label>
+          <select id="budget"><option value="0.5">0.5%</option><option value="1" selected>1%</option><option value="2">2%</option><option value="5">5%</option><option value="10">10%</option></select>
+          <span class="res" id="pick-res"></span>
+          <button class="btn" id="pick-load" disabled>Load and play</button>
+          <span class="st" id="opt-st"></span>
+          <p class="gd">The search simulates 700 random liquid classes for this liquid and volume, then picks the fastest one inside your error budget.</p>
+        </div>
+        <div class="opt-grid">
+          <div class="card">
+            <div class="card-h"><h2>Speed vs accuracy</h2>
+              <div class="legend"><span><i class="dot" style="background:var(--ink-3)"></i>Sampled setting</span><span><i class="dot" style="background:var(--series-1)"></i>Pareto front</span><span><i class="ring" style="color:var(--ink)"></i>Current</span></div>
+            </div>
+            <p class="gd gd-n">Each dot is one simulated liquid class. Left is faster and lower is more accurate. The blue staircase marks the best accuracy you can get at each speed.</p>
+            <canvas id="cv-pareto" aria-label="Scatter of transfer time against total error"></canvas>
+            <div class="card-f legend"><span>Total error = |bias| + 2·CV. Click a point to load it.</span></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h2>Aspirate rate × dispense rate</h2><span>other settings from the sidebar</span></div>
+            <p class="gd gd-n">Only the two rates change here. The box marks the best pair and the ring marks your current pair.</p>
+            <canvas id="cv-heat" aria-label="Heatmap of total error over aspirate and dispense rates"></canvas>
+            <div class="card-f legend"><span>Lighter is more accurate. Click a cell to use its rates.</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="v-model" hidden>
+        <div class="doc">
+          <h2>What the simulator computes</h2>
+          <p>One transfer through a single air-displacement channel with a conical 200 µL tip: aspirate from a reservoir, move 1 s, free-dispense into a well, blow out, lift. The liquid column is a lumped plug pushed by an isothermal air spring. Each run takes a few milliseconds, so the optimizer can try hundreds of liquid classes in a second or two.</p>
+          <h3>Column dynamics</h3>
+          <div class="eq">ρ·I(h)·dQ/dt = P_out − P_air − ρ·g·h + 2σ·cosθ / r(h) − [ R(h) + ½ρ|Q| / A₀² ]·Q
+
+P_air = n / V_air                         isothermal air gap (150 µL channel + tip)
+R(h)  = 8μ/(3πk)·(r₀⁻³ − r(h)⁻³) + 3μ/r₀³   Poiseuille in the cone + Sampson orifice term
+I(h)  = (1/πk)·(1/r₀ − 1/r(h)) + 2/(πr₀)     inertance of the column</div>
+          <p>The piston stroke includes a static correction for the column weight, like the correction curve in a real liquid class. What is left is dynamic error, which is what speeds, delays and blowout control.</p>
+          <h3>Loss mechanisms</h3>
+          <div class="tbl"><table>
+            <thead><tr><th>Mechanism</th><th>Model</th><th>Main controls</th></tr></thead>
+            <tbody>
+              <tr><td>Not drawn in yet</td><td>Flow lags the piston with time constant R·V_air/P; the tip leaves before the column catches up</td><td>Aspirate rate, aspirate delay</td></tr>
+              <tr><td>Degassing bubbles</td><td>Heuristic loss once air-gap suction passes 20 kPa</td><td>Aspirate rate</td></tr>
+              <tr><td>Dripped in transit</td><td>Column re-equilibrates when the hydrostatic support of the reservoir disappears</td><td>Fixed geometry</td></tr>
+              <tr><td>Wall film</td><td>Film forms only above the dewetting speed (Cox–Voinov), with Aussillous–Quéré thickness, then drains under gravity (Jeffreys profile)</td><td>Dispense rate, dispense delay</td></tr>
+              <tr><td>Left in tip</td><td>Column still in the tip when it lifts</td><td>Dispense delay, blowout volume</td></tr>
+              <tr><td>Hanging drop</td><td>Tate-limited drop stays on the orifice unless the liquid tail leaves as a jet (Weber number above 4)</td><td>Dispense and blowout rate</td></tr>
+              <tr><td>Splash / spray</td><td>Jet splash above Mundo K ≈ 57; blowout spray above about 2.5 m/s air speed</td><td>Dispense rate, blowout rate</td></tr>
+              <tr><td>Outside cling</td><td>Landau–Levich film on the outer wall during withdrawal; half of it reaches the well</td><td>Viscosity (2 mm immersion)</td></tr>
+            </tbody>
+          </table></div>
+          <h3>Limits</h3>
+          <p>Coefficients come from textbook scaling laws and typical polypropylene contact angles, not from a calibrated instrument. Use the results for intuition and as a cheap prior for real gravimetric tuning, not as settings to copy to a robot. Volatile liquids, foaming, non-Newtonian samples and contact dispense are out of scope.</p>
+          <h3>Related</h3>
+          <p><a href="https://pubs.rsc.org/en/content/articlehtml/2024/dd/d3dd00255a" target="_blank" rel="noopener">Multi-objective Bayesian optimization of viscous liquid handling (Digital Discovery, 2024)</a> tunes the same rates on real hardware with a balance. <a href="https://docs.opentrons.com/v2/liquid_classes.html" target="_blank" rel="noopener">Opentrons liquid classes</a> and Hamilton liquid classes expose the same parameters on real instruments.</p>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script id="simsrc">
+// Lumped air-displacement pipette model (SI units inside, µL at the edges).
+const P0 = 101325, G = 9.81, UL = 1e-9;
+const TIP = { L: 0.050, r0: 0.25e-3, r1: 2.6e-3, rOut: 0.45e-3, Vch: 150e-9, d: 2e-3, nseg: 100 };
+TIP.k = (TIP.r1 - TIP.r0) / TIP.L;
+TIP.dz = TIP.L / TIP.nseg;
+const rOf = h => TIP.r0 + TIP.k * h;
+const volOf = h => Math.PI / (3 * TIP.k) * (rOf(h) ** 3 - TIP.r0 ** 3);
+const hOf = V => (Math.cbrt(TIP.r0 ** 3 + 3 * TIP.k * Math.max(V, 0) / Math.PI) - TIP.r0) / TIP.k;
+TIP.Vtip = volOf(TIP.L);
+const A0 = Math.PI * TIP.r0 ** 2;
+const sig = x => 1 / (1 + Math.exp(-x));
+
+const LIQ = {
+  water: { name: 'Water', mu: 1.0e-3, rho: 998, sigma: 0.072, thA: 100, thR: 80 },
+  dmso: { name: 'DMSO', mu: 2.0e-3, rho: 1100, sigma: 0.0435, thA: 55, thR: 30 },
+  tween: { name: 'Buffer + 0.1% Tween', mu: 1.0e-3, rho: 1005, sigma: 0.033, thA: 60, thR: 25 },
+  gly50: { name: 'Glycerol 50%', mu: 6.0e-3, rho: 1126, sigma: 0.068, thA: 95, thR: 70 },
+  gly80: { name: 'Glycerol 80%', mu: 60e-3, rho: 1209, sigma: 0.065, thA: 95, thR: 70 },
+  gly95: { name: 'Glycerol 95%', mu: 523e-3, rho: 1248, sigma: 0.064, thA: 95, thR: 70 },
+};
+
+function simulate(liq, p, rec, DT = 5e-4) {
+  const { mu, rho, sigma } = liq;
+  const thA = liq.thA * Math.PI / 180, thR = liq.thR * Math.PI / 180;
+  const Vt = p.V * UL;
+  // Static stroke correction (what a liquid class correction curve does): the
+  // piston over-strokes so the air gap, expanded by the column weight, still holds Vt.
+  const ht = hOf(Vt);
+  const Va0 = TIP.Vch + TIP.Vtip;
+  const Peq = P0 + rho * G * (TIP.d - ht) + 2 * sigma * Math.cos(thA) / rOf(ht);
+  const Vs = P0 * Va0 / Peq - Va0 + Vt;
+  const phases = [
+    ['Aspirate', Vs / (p.qa * UL), p.qa * UL, true],
+    ['Delay', p.tad, 0, true],
+    ['Move', 1.0, 0, false],
+    ['Dispense', Vs / (p.qd * UL), -p.qd * UL, false],
+    ['Delay', p.tdd, 0, false],
+    ['Blowout', p.vbo > 0 ? p.vbo / p.qbo : 0, -p.qbo * UL, false],
+    ['Lift', 0.3, 0, false],
+  ];
+  const Uc = sigma * thR ** 3 / (9 * mu * 15); // Cox-Voinov dewetting speed
+  const filmT = (U, r) => {
+    if (U <= Uc) return 0;
+    const c = Math.pow(mu * U / sigma, 2 / 3);
+    return r * 1.34 * c / (1 + 3.35 * c) * (1 - Math.exp(-(U / Uc - 1)));
+  };
+  const Plap = 2 * sigma / TIP.r0;
+  const segV = new Float64Array(TIP.nseg), segT = new Float64Array(TIP.nseg);
+  let Vl = 0, Q = 0, Vp = 0, n = P0 * Va0, P = P0, t = 0;
+  let empty = false, te = -1, exited = 0, drip = 0, splash = 0, tailQ = 0;
+  let Vair = 0, uAir = 0, dPmin = 0, Vasp = 0, Qw = 0;
+  const out = rec ? { t: [], dp: [], vl: [], vp: [], phases: [] } : null;
+  let nextRec = 0;
+  const T = phases.reduce((s, x) => s + x[1], 0);
+  const recDt = Math.max(DT, T / 1500);
+  for (let pi = 0; pi < phases.length; pi++) {
+    const [name, dur, rate, imm] = phases[pi];
+    const t0 = t;
+    const ns = dur > 0 ? Math.ceil(dur / DT) : 0, dt = ns ? dur / ns : 0;
+    const air = !imm, liquidPhase = pi >= 3;
+    for (let s = 0; s < ns; s++) {
+      Vp += rate * dt;
+      t += dt;
+      if (!empty) {
+        P = n / (Va0 - Vl + Vp);
+        const h = hOf(Vl), r = rOf(h);
+        const Po = imm ? P0 + rho * G * TIP.d : P0;
+        const Pcap = 2 * sigma * Math.cos(Q >= 0 ? thA : thR) / r;
+        const R = 8 * mu / Math.PI / (3 * TIP.k) * (TIP.r0 ** -3 - r ** -3) + 3 * mu / TIP.r0 ** 3;
+        const I = rho * ((1 / (Math.PI * TIP.k)) * (1 / TIP.r0 - 1 / r) + 2 / (Math.PI * TIP.r0));
+        const c = 0.5 * rho * Math.abs(Q) / (A0 * A0);
+        const F = Po - P - rho * G * h + Pcap;
+        let Qn = (Q + dt * F / I) / (1 + dt * (R + c) / I);
+        if (air && Qn > 0) {
+          Qn = 0;
+          if (F > Plap * 1.001) { P = P0 - rho * G * h + Pcap - Plap; n = P * (Va0 - Vl + Vp); }
+        }
+        const dV = Qn * dt;
+        if (imm) {
+          Vl = Math.max(0, Vl + dV);
+        } else if (dV < 0) {
+          const o = Math.min(-dV, Vl);
+          Vl -= o;
+          if (!liquidPhase) drip += o;
+          else {
+            exited += o;
+            const u = Math.abs(Qn) / A0;
+            const We = rho * u * u * 2 * TIP.r0 / sigma, Re = rho * u * 2 * TIP.r0 / mu;
+            splash += o * 0.04 * sig((Math.sqrt(We) * Math.pow(Re, 0.25) - 57) / 6);
+            tailQ += (Math.abs(Qn) - tailQ) * Math.min(1, o / (2 * UL));
+          }
+          const h2 = hOf(Vl), U = (h - h2) / dt;
+          const th = filmT(U, r);
+          if (th > 0) {
+            const dVf = Math.min(2 * Math.PI * r * th * (h - h2), 0.5 * Vl);
+            Vl -= dVf;
+            const j = Math.min(TIP.nseg - 1, Math.floor(h2 / TIP.dz));
+            segV[j] += dVf; segT[j] = t;
+          }
+        }
+        Q = Qn;
+        if (liquidPhase && Vl <= 1e-13) { empty = true; te = t; Vl = 0; Q = 0; }
+        if (!empty) P = n / (Va0 - Vl + Vp);
+        else { P = P0; n = P0 * (Va0 + Vp); }
+        if (imm) dPmin = Math.min(dPmin, P - P0);
+      } else {
+        P = P0;
+        if (rate < 0) { const dv = -rate * dt; Vair += dv; uAir += (-rate / A0) * dv; }
+      }
+      if (rec && t >= nextRec) {
+        out.t.push(t); out.dp.push(P - P0); out.vl.push(Vl / UL); out.vp.push(Vp / UL);
+        nextRec = t + recDt;
+      }
+    }
+    if (rec) out.phases.push({ name, t0, t1: t });
+    if (pi === 1) { Vasp = Vl; Qw = Q; }
+  }
+  const tEnd = t;
+  // Gravity drainage of the wall film (Jeffreys profile h = sqrt(mu x / (rho g age))).
+  let ztop = 0, F = 0;
+  for (let j = 0; j < TIP.nseg; j++) if (segV[j] > 0) { ztop = Math.max(ztop, (j + 1) * TIP.dz); F += segV[j]; }
+  const drained = tt => {
+    let D = 0;
+    for (let j = 0; j < TIP.nseg; j++) {
+      if (segV[j] <= 0 || segT[j] > tt) continue;
+      const r = rOf((j + 0.5) * TIP.dz), A = 2 * Math.PI * r * TIP.dz;
+      const x = Math.max(ztop - (j + 0.5) * TIP.dz, TIP.dz / 2);
+      const hdr = Math.sqrt(mu * x / (rho * G * Math.max(tt - segT[j], 1e-3)));
+      D += segV[j] - A * Math.min(segV[j] / A, hdr);
+    }
+    return D;
+  };
+  const Dend = drained(tEnd);
+  // Drop left hanging on the tip end: Tate's law bound, cleared by a fast jet tail.
+  const Vmax = 0.6 * 2 * Math.PI * TIP.rOut * sigma / (rho * G);
+  const uT = tailQ / A0, WeT = rho * uT * uT * 2 * TIP.r0 / sigma;
+  const hf = 1 - sig((WeT - 4) / 1.2);
+  const hang = Math.min(0.35 * Vmax * hf, exited);
+  const hangRaw = hang;
+  let Ddirect = 0, pool = 0, clearFrac = 0, residual = 0, uMean = 0;
+  if (empty) {
+    Ddirect = drained(te);
+    pool = Dend - Ddirect;
+    if (Vair > 0) {
+      uMean = uAir / Vair;
+      clearFrac = (1 - Math.exp(-uMean / 0.3)) * (1 - Math.exp(-Vair / (8 * UL)));
+    }
+  } else residual = Vl + Dend;
+  const cleared = (hang + pool) * clearFrac;
+  const spray = cleared * 0.3 * sig((uMean - 2.5) / 0.4);
+  // Exterior film carried on the outside of the tip (Landau-Levich at 10 mm/s withdrawal).
+  const Uw = 0.01, lc = Math.sqrt(sigma / (rho * G));
+  const wW = Uw > Uc ? 1 - Math.exp(-(Uw / Uc - 1)) : 0;
+  const tExt = Math.min(0.94 * lc * Math.pow(mu * Uw / sigma, 2 / 3), 0.6e-3) * wW;
+  const cling = 0.5 * 2 * Math.PI * (TIP.rOut + TIP.k * TIP.d / 2) * TIP.d * tExt;
+  const bub = Math.min(0.02 * Math.max(0, -dPmin - 20e3) / 20e3, 0.08) * Vasp;
+  const delivered = exited - splash - hang + cleared - spray + Ddirect + cling - bub;
+  const filmWall = F - Dend;
+  const parts = {
+    lag: Vt - Vasp, bub, drip,
+    film: filmWall + pool * (1 - clearFrac),
+    hang: hang * (1 - clearFrac),
+    residual, splash: splash + spray, cling: -cling,
+  };
+  const sdHang = hang > 0 ? 0.7 * Vmax * hf / Math.sqrt(12) * (1 - clearFrac) : 0;
+  const sd = Math.sqrt((0.002 * Vt + 0.03 * UL) ** 2 + sdHang ** 2 + (0.5 * (splash + spray)) ** 2
+    + (0.15 * filmWall) ** 2 + (Math.abs(Qw) * 0.05) ** 2 + (empty ? 0 : Math.abs(Q) * 0.02) ** 2
+    + (0.3 * bub) ** 2 + (0.3 * cling) ** 2);
+  const errPct = (delivered - Vt) / Vt * 100, cvPct = sd / Vt * 100;
+  const res = {
+    delivered: delivered / UL, errPct, cvPct, score: Math.abs(errPct) + 2 * cvPct,
+    time: tEnd, parts: Object.fromEntries(Object.entries(parts).map(([k, v]) => [k, v / UL])),
+    dPmin, te, hang: hang * (1 - clearFrac) / UL, stroke: Vs / UL,
+  };
+  if (rec) {
+    out.segV = Array.from(segV, v => v / UL); out.segT = Array.from(segT);
+    out.tEnd = tEnd; res.trace = out; res.WeT = WeT; res.clearFrac = clearFrac; res.hangRaw = hangRaw / UL; res.vasp = Vasp / UL;
+  }
+  return res;
+}
+
+if (typeof module !== 'undefined') module.exports = { simulate, LIQ, TIP };
+
+</script>
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const LCOL = {
+  water: ['#4f9fe0', '#6cb4f0'], dmso: ['#8a9fc9', '#a5b8e0'], tween: ['#3fa9ae', '#5cc4c8'],
+  gly50: ['#c4a54b', '#d6ba66'], gly80: ['#cf8b26', '#e3a241'], gly95: ['#a95f14', '#d07f2c'],
+};
+const S = { liq: 'gly80', V: 100, qa: 100, tad: 0.5, qd: 100, tdd: 0.5, vbo: 20, qbo: 100 };
+const CTRL = [
+  { id: 'V', g: 'transfer', label: 'Target volume', unit: 'µL', min: 10, max: 200, map: 'lin', step: 5 },
+  { id: 'qa', g: 'Aspirate', label: 'Rate', unit: 'µL/s', min: 5, max: 600, map: 'log' },
+  { id: 'tad', g: 'Aspirate', label: 'Delay after', unit: 's', min: 0, max: 15, map: 'sq' },
+  { id: 'qd', g: 'Dispense', label: 'Rate', unit: 'µL/s', min: 5, max: 800, map: 'log' },
+  { id: 'tdd', g: 'Dispense', label: 'Delay after', unit: 's', min: 0, max: 15, map: 'sq' },
+  { id: 'vbo', g: 'Blowout', label: 'Air volume', unit: 'µL', min: 0, max: 40, map: 'lin', step: 1 },
+  { id: 'qbo', g: 'Blowout', label: 'Rate', unit: 'µL/s', min: 10, max: 600, map: 'log' },
+];
+const toVal = (c, x) => {
+  const f = x / 1000;
+  if (c.map === 'log') return Math.round(c.min * Math.pow(c.max / c.min, f));
+  if (c.map === 'sq') return Math.round(c.max * f * f * 10) / 10;
+  return Math.round((c.min + (c.max - c.min) * f) / c.step) * c.step;
+};
+const toPos = (c, v) => {
+  if (c.map === 'log') return 1000 * Math.log(v / c.min) / Math.log(c.max / c.min);
+  if (c.map === 'sq') return 1000 * Math.sqrt(v / c.max);
+  return 1000 * (v - c.min) / (c.max - c.min);
+};
+const fmt = (c, v) => (c.unit === 's' ? v.toFixed(1) : String(Math.round(v))) + ' ' + c.unit;
+
+let theme = {}, dark = false;
+function readTheme() {
+  const cs = getComputedStyle(document.documentElement);
+  for (const k of ['bg', 'panel', 'ink', 'ink-2', 'ink-3', 'line', 'band', 'accent', 'series-1', 'good', 'warn', 'bad'])
+    theme[k] = cs.getPropertyValue('--' + k).trim();
+  const attr = document.documentElement.getAttribute('data-theme');
+  dark = attr ? attr === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+}
+const liqColor = () => LCOL[S.liq][dark ? 1 : 0];
+
+// ---------- sidebar ----------
+const liqBox = $('#liqs');
+for (const [k, l] of Object.entries(LIQ)) {
+  const lab = document.createElement('label');
+  lab.className = 'liq';
+  const cp = l.mu * 1000;
+  lab.innerHTML = `<input type="radio" name="liq" id="liq-${k}" value="${k}"${k === S.liq ? ' checked' : ''}>` +
+    `<span class="sw" data-k="${k}"></span><span class="nm">${l.name}</span>` +
+    `<span class="pr">${cp < 10 ? cp.toFixed(1) : Math.round(cp)} cP</span>`;
+  lab.querySelector('input').addEventListener('change', () => { S.liq = k; onChange(true); });
+  liqBox.appendChild(lab);
+}
+function paintSwatches() { document.querySelectorAll('.sw').forEach(e => e.style.background = LCOL[e.dataset.k][dark ? 1 : 0]); $('#lg-liq').style.color = liqColor(); }
+const outs = {};
+for (const c of CTRL) {
+  const d = document.createElement('div');
+  d.className = 'ctl';
+  d.innerHTML = `<label for="s-${c.id}">${c.label}</label><output id="o-${c.id}"></output>` +
+    `<input type="range" id="s-${c.id}" min="0" max="1000" step="1">`;
+  $('#g-' + c.g).appendChild(d);
+  const inp = d.querySelector('input');
+  inp.value = toPos(c, S[c.id]);
+  outs[c.id] = d.querySelector('output');
+  outs[c.id].textContent = fmt(c, S[c.id]);
+  inp.addEventListener('input', () => { S[c.id] = toVal(c, +inp.value); outs[c.id].textContent = fmt(c, S[c.id]); onChange(c.id === 'V'); });
+}
+function setParams(p) {
+  for (const c of CTRL) if (p[c.id] != null) {
+    S[c.id] = c.map === 'sq' || c.unit === 's' ? Math.round(p[c.id] * 10) / 10 : Math.round(p[c.id]);
+    $('#s-' + c.id).value = toPos(c, S[c.id]);
+    outs[c.id].textContent = fmt(c, S[c.id]);
+  }
+}
+
+// ---------- canvas helpers ----------
+function fit(cv) {
+  const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  const w = Math.max(10, r.width), h = Math.max(10, r.height);
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  return { ctx, w, h };
+}
+function ticks(a, b, n) {
+  const span = b - a || 1, raw = span / n, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const st = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => span / s <= n) || 10 * mag;
+  const out = [];
+  for (let v = Math.ceil(a / st) * st; v <= b + 1e-9; v += st) out.push(+v.toFixed(10));
+  return out;
+}
+const fnum = v => Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1).replace(/\.0$/, '') : (+v.toFixed(2)).toString();
+function alpha(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`;
+}
+function tipBox(ctx, x, y, lines, w, h) {
+  ctx.font = '12px "IBM Plex Mono", monospace';
+  const bw = Math.max(...lines.map(l => ctx.measureText(l).width)) + 16, bh = lines.length * 17 + 10;
+  let bx = x + 12, by = y - bh - 8;
+  if (bx + bw > w - 4) bx = x - bw - 12;
+  if (by < 4) by = y + 12;
+  if (by + bh > h - 4) by = h - bh - 4;
+  ctx.fillStyle = theme.panel; ctx.strokeStyle = theme.line; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 6); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = theme.ink; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
+  lines.forEach((l, i) => { ctx.fillStyle = i ? theme['ink-2'] : theme.ink; ctx.fillText(l, bx + 8, by + 6 + i * 17); });
+}
+
+// ---------- simulation state ----------
+let cur = null, tNow = 0, playing = false, hoverT = null, guide = false, runId = 0, capKey = '';
+function runSim() {
+  cur = simulate(LIQ[S.liq], S, true, 5e-4);
+  runId++;
+  const tr = cur.trace, ph = tr.phases;
+  tr.dispIdx = tr.t.findIndex(t => t >= ph[3].t0);
+  // Key moments for guide annotations on the traces.
+  const argIn = (t0, t1, f) => {
+    let bi = -1, bv = -Infinity;
+    tr.t.forEach((t, k) => { if (t >= t0 && t <= t1) { const v = f(k); if (v > bv) { bv = v; bi = k; } } });
+    return [bi, bv];
+  };
+  tr.events = [];
+  let [k, v] = argIn(0, ph[1].t1, k => -tr.dp[k]);
+  if (k >= 0 && v > 50) tr.events.push({ k, pane: 'p', text: 'suction pulls liquid up' });
+  [k, v] = argIn(ph[3].t0, ph[3].t1, k => tr.dp[k]);
+  if (k >= 0 && v > 50) tr.events.push({ k, pane: 'p', text: 'push drives liquid out' });
+  // Lag is the stroke-liquid gap beyond the settled offset (air spring + column weight).
+  const kEnd = idxAt(ph[1].t1), off = tr.vp[kEnd] - tr.vl[kEnd];
+  [k, v] = argIn(0, ph[1].t1, k => tr.vp[k] - tr.vl[k] - off);
+  if (k >= 0 && v > 1) tr.events.push({ k, pane: 'v', text: 'liquid trails the piston' });
+}
+// One-line explanation of the physics in each phase, using this run's numbers.
+function caption(pi) {
+  const P = cur.parts, u = v => `${v.toFixed(1)} µL`, thick = LIQ[S.liq].mu > 0.02;
+  const net = cur.delivered - S.V;
+  return [
+    ['Aspirate', `The piston rises and the air gap goes into suction, pulling liquid up the tip. ${thick ? 'This thick liquid trails well behind the piston.' : 'A thin liquid keeps up almost at once.'}`],
+    ['Delay', `The tip waits in the source while the column catches up. ${P.lag > 0.05 ? `It is still ${u(P.lag)} short when the tip leaves.` : 'It is fully caught up before the tip leaves.'}`],
+    ['Move', `The tip travels to the destination. ${P.drip > 0.05 ? `${u(P.drip)} drips out on the way.` : 'Surface tension holds the column in.'}`],
+    ['Dispense', `The piston pushes down and the liquid leaves ${cur.WeT > 4 ? 'as a jet' : 'drop by drop'}. ${P.film > 0.05 ? `The meniscus moves faster than the liquid can let go of the wall, so a film stays behind (${u(P.film)} by the end).` : 'The meniscus moves slowly enough that the wall stays clean.'}`],
+    ['Delay', `The tip waits so the wall film can drain down and out. ${cur.hangRaw > 0.05 ? `A ${u(cur.hangRaw)} drop hangs on the tip end.` : ''}`],
+    ['Blowout', `A puff of air knocks off the drop and the leftover liquid at the tip end. About ${Math.round(cur.clearFrac * 100)}% of it is cleared.`],
+    ['Lift', `The tip withdraws, and anything still on it is lost. Net result: ${net >= 0 ? '+' : '−'}${Math.abs(net).toFixed(2)} µL against the target.`],
+  ][pi];
+}
+const idxAt = t => {
+  const a = cur.trace.t; let lo = 0, hi = a.length - 1;
+  while (lo < hi) { const m = (lo + hi + 1) >> 1; if (a[m] <= t) lo = m; else hi = m - 1; }
+  return lo;
+};
+const phaseAt = t => cur.trace.phases.findIndex(p => t <= p.t1 && p.t1 > p.t0) ;
+
+function renderOutputs() {
+  const r = cur;
+  $('#o-del').innerHTML = `${r.delivered.toFixed(r.delivered < 100 ? 2 : 1)}<small>µL</small>`;
+  $('#o-del-s').textContent = `target ${S.V} µL`;
+  $('#o-err').innerHTML = `${r.errPct >= 0 ? '+' : '−'}${Math.abs(r.errPct).toFixed(2)}<small>%</small>`;
+  $('#o-cv').innerHTML = `${r.cvPct.toFixed(2)}<small>%</small>`;
+  $('#o-time').innerHTML = `${r.time.toFixed(1)}<small>s</small>`;
+  const sc = r.score, cls = sc <= 1 ? 'good' : sc <= 5 ? 'warn' : 'bad';
+  const icon = cls === 'good' ? '✓' : cls === 'warn' ? '!' : '✕';
+  $('#o-chip').innerHTML = `<span class="chip ${cls}">${icon} total error ${sc < 10 ? sc.toFixed(1) : Math.round(sc)}%</span>`;
+  const rows = [
+    ['lag', 'Not drawn in yet', 'Liquid still flowing into the tip when it left the source'],
+    ['bub', 'Degassing bubbles', 'Strong suction pulled gas out of solution'],
+    ['drip', 'Dripped in transit', 'Column slipped when the reservoir support went away'],
+    ['film', 'Wall film', 'Liquid left coating the inside of the tip'],
+    ['residual', 'Left in tip', 'Column had not finished leaving when the tip lifted'],
+    ['hang', 'Hanging drop', 'Drop stuck to the tip end'],
+    ['splash', 'Splash / spray', 'Jet splash or blowout spray outside the well'],
+    ['cling', 'Outside cling', 'Film on the outer wall that drained into the well (adds volume)'],
+  ];
+  const mx = Math.max(1, ...rows.map(([k]) => Math.abs(r.parts[k])));
+  let h = '';
+  for (const [k, lb, tt] of rows) {
+    const v = -r.parts[k], z = Math.abs(v) < 0.005;
+    h += `<span class="lb${z ? ' zero' : ''}" title="${tt}">${lb}</span>` +
+      `<span class="bar"><b class="${v > 0 ? 'gain' : ''}" style="width:${(Math.abs(v) / mx * 100).toFixed(1)}%"></b></span>` +
+      `<span class="vl${z ? ' zero' : ''}">${z ? '0' : (v > 0 ? '+' : '−') + Math.abs(v).toFixed(2)}</span>`;
+    if (guide && !z) h += `<span class="ds">${tt}</span>`;
+  }
+  const tot = r.delivered - S.V;
+  h += `<span class="lb tot">Net</span><span class="tot"></span><span class="vl tot">${tot >= 0 ? '+' : '−'}${Math.abs(tot).toFixed(2)}</span>`;
+  $('#bk').innerHTML = h;
+  const sp = Math.max(1, cur.trace.tEnd / 8);
+  $('#speed').textContent = sp > 1.05 ? `playback ×${sp.toFixed(1)}` : 'real time';
+}
+
+// ---------- scene ----------
+const cvScene = $('#cv-scene');
+function drawScene() {
+  const { ctx, w, h } = fit(cvScene);
+  if (!cur) return;
+  const tr = cur.trace, t = tNow, i = idxAt(t), liq = LIQ[S.liq], col = liqColor();
+  const pi = Math.max(0, phaseAt(t)), ph = tr.phases[pi];
+  const yb = h - 22, ySrc = yb - 48, rimTop = yb - 74, yLift = rimTop - 10, yDisp = rimTop + 4;
+  const s = Math.min((yLift - 40) / 72, w / 70), X = 3;
+  const xSrc = w * 0.28, xDst = w * 0.74;
+  // tip pose
+  let x = xSrc, yo = ySrc + TIP.d * 1000 * s;
+  const lerp = (a, b, u) => a + (b - a) * u, ease = u => u * u * (3 - 2 * u);
+  if (pi === 2) {
+    const u = (t - ph.t0) / (ph.t1 - ph.t0);
+    if (u < 0.3) yo = lerp(yo, yLift, ease(u / 0.3));
+    else if (u < 0.7) { yo = yLift; x = lerp(xSrc, xDst, ease((u - 0.3) / 0.4)); }
+    else { x = xDst; yo = lerp(yLift, yDisp, ease((u - 0.7) / 0.3)); }
+  } else if (pi >= 3) {
+    x = xDst; yo = yDisp;
+    if (pi === 6) yo = lerp(yDisp, yLift, ease((t - ph.t0) / (ph.t1 - ph.t0)));
+  }
+  // containers
+  ctx.lineWidth = 1.5; ctx.strokeStyle = theme['ink-3'];
+  const sx0 = w * 0.08, sx1 = w * 0.48;
+  ctx.fillStyle = alpha(col, 0.55); ctx.fillRect(sx0, ySrc, sx1 - sx0, yb - ySrc);
+  ctx.beginPath(); ctx.moveTo(sx0, rimTop); ctx.lineTo(sx0, yb); ctx.lineTo(sx1, yb); ctx.lineTo(sx1, rimTop); ctx.stroke();
+  const dx0 = w * 0.62, dx1 = w * 0.86;
+  let disp = 0;
+  if (pi >= 3 && tr.dispIdx >= 0) disp = Math.max(0, cur.vasp - tr.vl[i]);
+  const fillH = Math.min(1, disp / 200) * (yb - rimTop - 16);
+  ctx.fillStyle = alpha(col, 0.55); ctx.fillRect(dx0, yb - fillH, dx1 - dx0, fillH);
+  ctx.beginPath(); ctx.moveTo(dx0, rimTop); ctx.lineTo(dx0, yb); ctx.lineTo(dx1, yb); ctx.lineTo(dx1, rimTop); ctx.stroke();
+  ctx.fillStyle = theme['ink-3']; ctx.font = '11px "IBM Plex Sans", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.fillText('Source', (sx0 + sx1) / 2, yb + 5); ctx.fillText('Destination', (dx0 + dx1) / 2, yb + 5);
+  // stream
+  const vl = tr.vl[i];
+  if (pi >= 3 && pi <= 5 && i > 0) {
+    const rate = -(tr.vl[i] - tr.vl[i - 1]) / Math.max(1e-6, tr.t[i] - tr.t[i - 1]);
+    if (rate > 1) {
+      const u = rate * 1e-9 / (Math.PI * TIP.r0 ** 2), We = liq.rho * u * u * 2 * TIP.r0 / liq.sigma;
+      const yEnd = yb - fillH, wd = Math.min(6, Math.max(1.2, Math.sqrt(rate) / 4));
+      ctx.fillStyle = col; ctx.strokeStyle = col;
+      if (We > 4) { ctx.lineWidth = wd; ctx.beginPath(); ctx.moveTo(x, yo); ctx.lineTo(x, yEnd); ctx.stroke(); }
+      else {
+        const gap = 14, off = (t * 160) % gap;
+        for (let y = yo + 4 + off; y < yEnd; y += gap) { ctx.beginPath(); ctx.arc(x, y, wd * 0.9, 0, 7); ctx.fill(); }
+      }
+    }
+  }
+  // tip body
+  const L = TIP.L * 1000, r = z => (TIP.r0 + TIP.k * z / 1000) * 1000;
+  const Y = z => yo - z * s, Rx = z => r(z) * s * X;
+  const yTop = Y(L), chH = 20 * s, chW = Rx(L) + 5;
+  ctx.fillStyle = theme.panel;
+  ctx.beginPath(); ctx.moveTo(x - Rx(0), yo); ctx.lineTo(x - Rx(L), yTop); ctx.lineTo(x + Rx(L), yTop); ctx.lineTo(x + Rx(0), yo); ctx.closePath(); ctx.fill();
+  // air tint by pressure
+  const dpk = tr.dp[i] / 1000, hcol = hOf(vl * 1e-9) * 1000;
+  const tint = dpk < 0 ? theme['series-1'] : theme.bad;
+  const ta = Math.min(1, Math.abs(dpk) / 6) * 0.28;
+  const yPist = yTop - chH + 4 + (1 - (tr.vp[i] + 40) / 240) * (chH - 10);
+  ctx.fillStyle = alpha(tint, ta);
+  ctx.fillRect(x - chW + 1.5, yPist, 2 * chW - 3, yTop - yPist);
+  ctx.beginPath(); ctx.moveTo(x - Rx(hcol), Y(hcol)); ctx.lineTo(x - Rx(L), yTop); ctx.lineTo(x + Rx(L), yTop); ctx.lineTo(x + Rx(hcol), Y(hcol)); ctx.closePath(); ctx.fill();
+  // liquid column
+  if (vl > 0.001) {
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.moveTo(x - Rx(0), yo); ctx.lineTo(x - Rx(hcol), Y(hcol)); ctx.lineTo(x + Rx(hcol), Y(hcol)); ctx.lineTo(x + Rx(0), yo); ctx.closePath(); ctx.fill();
+  }
+  // wall film (thickness exaggerated)
+  ctx.fillStyle = col;
+  const dz = TIP.dz * 1000;
+  let ztop = 0;
+  const filmMark = { px: 0, z: 0 };
+  tr.segV.forEach((v, j) => { if (v > 0 && tr.segT[j] <= t) ztop = Math.max(ztop, (j + 1) * dz); });
+  tr.segV.forEach((v, j) => {
+    if (v <= 0 || tr.segT[j] > t) return;
+    const zc = (j + 0.5) * dz; if (zc < hcol) return;
+    const rm = r(zc) / 1000, A = 2 * Math.PI * rm * TIP.dz;
+    const th0 = v * 1e-9 / A, xx = Math.max((ztop - zc) / 1000, TIP.dz / 2);
+    const th = Math.min(th0, Math.sqrt(liq.mu * xx / (liq.rho * 9.81 * Math.max(t - tr.segT[j], 1e-3))));
+    const px = Math.min(5, th * 1000 * s * X * 6);
+    if (px < 0.4) return;
+    if (px > filmMark.px) Object.assign(filmMark, { px, z: zc });
+    const y0 = Y(j * dz), y1 = Y((j + 1) * dz);
+    ctx.beginPath(); ctx.moveTo(x - Rx(j * dz), y0); ctx.lineTo(x - Rx((j + 1) * dz), y1); ctx.lineTo(x - Rx((j + 1) * dz) + px, y1); ctx.lineTo(x - Rx(j * dz) + px, y0); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x + Rx(j * dz), y0); ctx.lineTo(x + Rx((j + 1) * dz), y1); ctx.lineTo(x + Rx((j + 1) * dz) - px, y1); ctx.lineTo(x + Rx(j * dz) - px, y0); ctx.fill();
+  });
+  // hanging drop
+  const dEnd = tr.phases[3].t1, bo = tr.phases[5];
+  let drop = null;
+  if (pi >= 4 && t >= dEnd && cur.hangRaw > 0.01) {
+    let v = cur.hangRaw;
+    if (t >= bo.t0 && bo.t1 > bo.t0) v = lerp(cur.hangRaw, cur.hang, Math.min(1, (t - bo.t0) / (bo.t1 - bo.t0)));
+    if (pi === 6) v = cur.hang;
+    if (v > 0.01) {
+      const rr = Math.cbrt(3 * v / (4 * Math.PI)) * s * 1.6;
+      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, yo + rr * 0.8, rr, 0, 7); ctx.fill();
+      drop = { y: yo + rr * 0.8, r: rr };
+    }
+  }
+  // walls
+  ctx.strokeStyle = theme.ink; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.moveTo(x - Rx(0) - 1, yo); ctx.lineTo(x - Rx(L) - 1, yTop); ctx.moveTo(x + Rx(0) + 1, yo); ctx.lineTo(x + Rx(L) + 1, yTop); ctx.stroke();
+  // channel and piston
+  ctx.strokeRect(x - chW, yTop - chH, 2 * chW, chH);
+  ctx.fillStyle = theme['ink-3'];
+  ctx.fillRect(x - chW + 2, yTop - chH + 1, 2 * chW - 4, yPist - (yTop - chH) - 1);
+  ctx.fillRect(x - 2, yTop - chH - 14, 4, 14);
+  // labels go on whichever side of the tip has more room
+  const onR = x < w / 2, sd = d => onR ? x + d : x - d;
+  ctx.textAlign = onR ? 'left' : 'right'; ctx.textBaseline = 'middle';
+  const dpTxt = `${dpk >= 0 ? '+' : '−'}${Math.abs(dpk).toFixed(2)} kPa`;
+  if (!guide) {
+    ctx.font = '12px "IBM Plex Mono", monospace'; ctx.fillStyle = theme.ink;
+    ctx.fillText(`ΔP ${dpTxt}`, sd(chW + 8), yTop - chH / 2);
+    ctx.fillStyle = theme['ink-2'];
+    ctx.fillText(`${vl.toFixed(1)} µL in tip`, sd(Rx(L) + 8), yTop + 22);
+  } else {
+    // Named parts with leader lines, spread so they never overlap.
+    const tags = [{ y: (yTop - chH + yPist) / 2, e: chW, t: 'Piston' }];
+    const yAir = (yPist + Y(hcol)) / 2;
+    tags.push({ y: yAir, e: yAir < yTop ? chW : Rx((yo - yAir) / s), t: `Air gap ${Math.abs(dpk) < 0.005 ? 'at rest' : dpk < 0 ? 'suction ' + dpTxt.slice(1) : 'push ' + dpTxt}` });
+    if (vl > 0.3) tags.push({ y: Y(hcol / 2), e: Rx(hcol / 2), t: `Liquid ${vl.toFixed(1)} µL` });
+    if (filmMark.px >= 0.8) tags.push({ y: Y(filmMark.z), e: Rx(filmMark.z), t: 'Wall film' });
+    if (drop) tags.push({ y: drop.y, e: drop.r, t: 'Hanging drop' });
+    tags.sort((a, b) => a.y - b.y);
+    for (let k = 1; k < tags.length; k++) tags[k].ly = Math.max(tags[k].y, (tags[k - 1].ly ?? tags[k - 1].y) + 16);
+    const col0 = chW + 14;
+    ctx.font = '12px "IBM Plex Sans", sans-serif'; ctx.lineWidth = 1;
+    for (const g of tags) {
+      const ly = g.ly ?? g.y;
+      ctx.strokeStyle = theme['ink-3']; ctx.beginPath(); ctx.moveTo(sd(g.e + 2), g.y); ctx.lineTo(sd(col0 - 4), ly); ctx.stroke();
+      ctx.fillStyle = theme.ink; ctx.fillText(g.t, sd(col0), ly);
+    }
+  }
+  if (guide) {
+    const key = pi + '|' + runId;
+    if (key !== capKey) { capKey = key; const c = caption(pi); $('#cap').innerHTML = `<b>${c[0]}.</b> ${c[1]}`; }
+  }
+  ctx.font = '600 13px "IBM Plex Sans", sans-serif'; ctx.fillStyle = theme.ink; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
+  ctx.fillText(ph ? ph.name : '', 12, 10);
+  ctx.textAlign = 'right'; ctx.font = '12px "IBM Plex Mono", monospace'; ctx.fillStyle = theme['ink-2'];
+  ctx.fillText(`t = ${t.toFixed(2)} s`, w - 12, 11);
+  ctx.textAlign = 'left'; ctx.font = '11px "IBM Plex Sans", sans-serif'; ctx.fillStyle = theme['ink-3'];
+  ctx.fillText('tip width ×3, film ×6', 12, 28);
+}
+
+// ---------- traces ----------
+const cvTrace = $('#cv-trace');
+let traceGeo = null;
+function drawTraces() {
+  const { ctx, w, h } = fit(cvTrace);
+  if (!cur) return;
+  const tr = cur.trace, T = tr.tEnd;
+  const L = 50, R = 14, top = 26, B = 24, gap = 30, ph = (h - top - B - gap) / 2;
+  const x0 = L, x1 = w - R, X = t => x0 + (x1 - x0) * t / T;
+  const pa = { y0: top, y1: top + ph }, pb = { y0: top + ph + gap, y1: h - B };
+  traceGeo = { x0, x1, T };
+  ctx.font = '11px "IBM Plex Sans", sans-serif';
+  // phase bands
+  tr.phases.forEach((p, k) => {
+    if (p.t1 - p.t0 <= 1e-9) return;
+    const a = X(p.t0), b = X(p.t1);
+    if (k % 2 === 1) { ctx.fillStyle = theme.band; ctx.fillRect(a, pa.y0, b - a, pa.y1 - pa.y0); ctx.fillRect(a, pb.y0, b - a, pb.y1 - pb.y0); }
+    ctx.fillStyle = theme['ink-3']; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    if (ctx.measureText(p.name).width < b - a - 4) ctx.fillText(p.name, (a + b) / 2, pa.y0 - 6);
+  });
+  // pressure pane
+  const dp = tr.dp.map(v => v / 1000);
+  let lo = Math.min(0, ...dp), hi = Math.max(0, ...dp);
+  const pad = (hi - lo) * 0.08 || 0.5; lo -= pad; hi += pad;
+  const Yp = v => pa.y1 - (pa.y1 - pa.y0) * (v - lo) / (hi - lo);
+  const grid = (pane, Yf, tks, unit) => {
+    ctx.strokeStyle = theme.line; ctx.lineWidth = 1; ctx.fillStyle = theme['ink-3']; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    tks.forEach(v => { const y = Math.round(Yf(v)) + 0.5; ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke(); ctx.fillText(fnum(v), x0 - 6, y); });
+    ctx.save(); ctx.translate(12, (pane.y0 + pane.y1) / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'center'; ctx.fillText(unit, 0, 0); ctx.restore();
+  };
+  grid(pa, Yp, ticks(lo, hi, 4), 'ΔP kPa');
+  ctx.strokeStyle = theme['ink-3']; ctx.beginPath(); ctx.moveTo(x0, Yp(0)); ctx.lineTo(x1, Yp(0)); ctx.stroke();
+  ctx.strokeStyle = theme['series-1']; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.beginPath();
+  tr.t.forEach((t, k) => { const xx = X(t), yy = Yp(dp[k]); k ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy); }); ctx.stroke();
+  // volume pane
+  const vmax = Math.max(S.V * 1.05, ...tr.vp) , vmin = Math.min(0, ...tr.vp);
+  const Yv = v => pb.y1 - (pb.y1 - pb.y0) * (v - vmin) / (vmax - vmin);
+  grid(pb, Yv, ticks(vmin, vmax, 4), 'µL');
+  const col = liqColor();
+  ctx.fillStyle = alpha(col, 0.25); ctx.beginPath(); ctx.moveTo(X(0), Yv(0));
+  tr.t.forEach((t, k) => ctx.lineTo(X(t), Yv(tr.vl[k]))); ctx.lineTo(X(T), Yv(0)); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath();
+  tr.t.forEach((t, k) => { k ? ctx.lineTo(X(t), Yv(tr.vl[k])) : ctx.moveTo(X(t), Yv(tr.vl[k])); }); ctx.stroke();
+  ctx.strokeStyle = theme['ink-2']; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]); ctx.beginPath();
+  tr.t.forEach((t, k) => { k ? ctx.lineTo(X(t), Yv(tr.vp[k])) : ctx.moveTo(X(t), Yv(tr.vp[k])); }); ctx.stroke(); ctx.setLineDash([]);
+  // x axis
+  ctx.fillStyle = theme['ink-3']; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ticks(0, T, Math.max(3, Math.floor((x1 - x0) / 70))).forEach(v => ctx.fillText(fnum(v) + (v === 0 ? '' : ''), X(v), pb.y1 + 6));
+  ctx.textAlign = 'right'; ctx.fillText('s', x1, pb.y1 + 6);
+  // guide: mark the moments that explain the curves
+  if (guide) {
+    ctx.font = '11px "IBM Plex Sans", sans-serif'; ctx.textBaseline = 'middle';
+    for (const e of tr.events) {
+      const pane = e.pane === 'p' ? pa : pb, xx = X(tr.t[e.k]), yy = e.pane === 'p' ? Yp(dp[e.k]) : Yv(tr.vl[e.k]);
+      ctx.strokeStyle = theme.ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(xx, yy, 5, 0, 7); ctx.stroke();
+      const tw = ctx.measureText(e.text).width, right = xx + 10 + tw < x1;
+      const ty = Math.min(pane.y1 - 9, Math.max(pane.y0 + 9, yy)), tx = right ? xx + 10 : xx - 10 - tw;
+      ctx.fillStyle = alpha(theme.panel.startsWith('#') ? theme.panel : '#ffffff', 0.85); ctx.fillRect(tx - 3, ty - 8, tw + 6, 16);
+      ctx.fillStyle = theme.ink; ctx.textAlign = 'left'; ctx.fillText(e.text, tx, ty);
+    }
+  }
+  // playhead
+  const xp = X(tNow);
+  ctx.strokeStyle = theme.ink; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(xp, pa.y0); ctx.lineTo(xp, pb.y1); ctx.stroke();
+  // hover
+  if (hoverT != null) {
+    const k = idxAt(hoverT), xh = X(tr.t[k]);
+    ctx.strokeStyle = theme['ink-3']; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(xh, pa.y0); ctx.lineTo(xh, pb.y1); ctx.stroke(); ctx.setLineDash([]);
+    const dot = (yy, c) => { ctx.fillStyle = c; ctx.strokeStyle = theme.panel; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(xh, yy, 4.5, 0, 7); ctx.fill(); ctx.stroke(); };
+    dot(Yp(dp[k]), theme['series-1']); dot(Yv(tr.vl[k]), col);
+    const phn = tr.phases[Math.max(0, phaseAt(tr.t[k]))].name;
+    tipBox(ctx, xh, Yp(dp[k]), [`${tr.t[k].toFixed(2)} s · ${phn}`, `ΔP ${dp[k].toFixed(2)} kPa`, `in tip ${tr.vl[k].toFixed(2)} µL`, `stroke ${tr.vp[k].toFixed(1)} µL`], w, h);
+  }
+}
+const tAtX = ev => {
+  const r = cvTrace.getBoundingClientRect(), g = traceGeo;
+  return Math.min(g.T, Math.max(0, (ev.clientX - r.left - g.x0) / (g.x1 - g.x0) * g.T));
+};
+let scrubbing = false;
+cvTrace.addEventListener('pointermove', ev => { if (!traceGeo) return; hoverT = tAtX(ev); if (scrubbing) tNow = hoverT; drawTraces(); if (scrubbing) drawScene(); });
+cvTrace.addEventListener('pointerleave', () => { hoverT = null; drawTraces(); });
+cvTrace.addEventListener('pointerdown', ev => { if (!traceGeo) return; stop(); scrubbing = true; cvTrace.setPointerCapture(ev.pointerId); tNow = tAtX(ev); drawAll(); });
+cvTrace.addEventListener('pointerup', () => { scrubbing = false; });
+
+// ---------- playback ----------
+let raf = 0, last = 0;
+function frame(ts) {
+  if (!playing) return;
+  const dt = (ts - last) / 1000; last = ts;
+  const sp = Math.max(1, cur.trace.tEnd / 8);
+  tNow = Math.min(cur.trace.tEnd, tNow + dt * sp);
+  drawScene(); drawTraces();
+  if (tNow >= cur.trace.tEnd) { stop(); return; }
+  raf = requestAnimationFrame(frame);
+}
+function play() { if (tNow >= cur.trace.tEnd - 1e-6) tNow = 0; playing = true; $('#play').textContent = 'Pause'; last = performance.now(); raf = requestAnimationFrame(frame); }
+function stop() { playing = false; cancelAnimationFrame(raf); $('#play').textContent = 'Play'; }
+$('#play').addEventListener('click', () => playing ? stop() : play());
+
+function drawAll() { drawScene(); drawTraces(); }
+let optDirty = { search: true, grid: true };
+function onChange(searchToo) {
+  stop(); runSim(); tNow = cur.trace.tEnd; renderOutputs(); paintSwatches(); drawAll();
+  optDirty.grid = true; if (searchToo) optDirty.search = true;
+  if (view === 'opt') scheduleOpt();
+}
+
+// ---------- optimizer (web workers) ----------
+const SRC = document.getElementById('simsrc').textContent;
+const WORKER = SRC + `
+const rng = s => () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+const lu = (r, a, b) => Math.exp(Math.log(a) + r() * (Math.log(b) - Math.log(a)));
+onmessage = e => {
+  const m = e.data, liq = LIQ[m.liq];
+  if (m.type === 'search') {
+    const r = rng(7), out = [];
+    for (let i = 0; i < m.N; i++) {
+      const p = { V: m.V, qa: lu(r, 5, 600), tad: 15 * r() ** 2, qd: lu(r, 5, 800), tdd: 15 * r() ** 2, vbo: 40 * r(), qbo: lu(r, 10, 600) };
+      const s = simulate(liq, p, false, 1e-3);
+      out.push({ p, score: s.score, err: s.errPct, cv: s.cvPct, time: s.time });
+      if (i % 40 === 39) postMessage({ type: 'progress', done: i + 1, N: m.N });
+    }
+    postMessage({ type: 'search', pts: out });
+  } else {
+    const G = m.G, vals = new Float64Array(G * G);
+    for (let a = 0; a < G; a++) for (let d = 0; d < G; d++) {
+      const p = Object.assign({}, m.p, { qa: 5 * Math.pow(120, a / (G - 1)), qd: 5 * Math.pow(160, d / (G - 1)) });
+      vals[d * G + a] = simulate(liq, p, false, 1e-3).score;
+    }
+    postMessage({ type: 'grid', vals, G });
+  }
+};`;
+const workerURL = URL.createObjectURL(new Blob([WORKER], { type: 'text/javascript' }));
+let wSearch = null, wGrid = null, pts = null, grid = null, prog = 0, optTimer = 0;
+function scheduleOpt() { clearTimeout(optTimer); optTimer = setTimeout(runOpt, 200); }
+function runOpt() {
+  if (optDirty.search) {
+    optDirty.search = false; pts = null; prog = 0;
+    if (wSearch) wSearch.terminate();
+    wSearch = new Worker(workerURL);
+    wSearch.onmessage = e => {
+      if (e.data.type === 'progress') { prog = e.data.done / e.data.N; status(); return; }
+      pts = e.data.pts; status(); drawPareto(); pickBest();
+    };
+    wSearch.postMessage({ type: 'search', liq: S.liq, V: S.V, N: 700 });
+  }
+  if (optDirty.grid) {
+    optDirty.grid = false;
+    if (wGrid) wGrid.terminate();
+    wGrid = new Worker(workerURL);
+    wGrid.onmessage = e => { grid = e.data; drawHeat(); };
+    wGrid.postMessage({ type: 'grid', liq: S.liq, p: { ...S }, G: 22 });
+  }
+  status(); drawPareto(); drawHeat(); pickBest();
+}
+function status() {
+  $('#opt-st').textContent = pts ? `${pts.length} settings tried for ${LIQ[S.liq].name}, ${S.V} µL` : `searching… ${Math.round(prog * 100)}%`;
+}
+let front = [], best = null;
+function pickBest() {
+  const box = $('#pick-res'), btn = $('#pick-load');
+  if (!pts) { box.textContent = ''; btn.disabled = true; return; }
+  const b = +$('#budget').value;
+  const ok = pts.filter(q => q.score <= b).sort((a, c) => a.time - c.time);
+  best = ok[0] || null;
+  btn.disabled = !best;
+  if (!best) {
+    const m = pts.reduce((a, c) => c.score < a.score ? c : a);
+    box.innerHTML = `No sampled setting reaches ${b}%. Best found: <b>${m.score.toFixed(1)}%</b> in ${m.time.toFixed(1)} s.`;
+    best = m; btn.disabled = false; return;
+  }
+  const p = best.p;
+  box.innerHTML = `<b>${best.time.toFixed(1)} s</b> at ${best.score.toFixed(2)}% · <code>asp ${Math.round(p.qa)} µL/s, wait ${p.tad.toFixed(1)} s · disp ${Math.round(p.qd)} µL/s, wait ${p.tdd.toFixed(1)} s · blow ${Math.round(p.vbo)} µL @ ${Math.round(p.qbo)}</code>`;
+}
+$('#budget').addEventListener('change', () => { pickBest(); drawPareto(); });
+$('#pick-load').addEventListener('click', () => { if (best) { setParams(best.p); onChange(false); setView('sim'); play(); } });
+
+const cvPar = $('#cv-pareto');
+let parGeo = null, parHover = -1;
+function drawPareto() {
+  const { ctx, w, h } = fit(cvPar);
+  ctx.font = '11px "IBM Plex Sans", sans-serif';
+  if (!pts) { ctx.fillStyle = theme['ink-3']; ctx.textAlign = 'center'; ctx.fillText(`Searching ${Math.round(prog * 100)}%`, w / 2, h / 2); parGeo = null; return; }
+  const L = 52, R = 16, T = 14, B = 34;
+  const tmin = Math.min(...pts.map(q => q.time)) * 0.9, tmax = Math.max(...pts.map(q => q.time)) * 1.05;
+  const smin = 0.1, smax = 200;
+  const X = v => L + (w - L - R) * Math.log(v / tmin) / Math.log(tmax / tmin);
+  const Y = v => h - B - (h - T - B) * Math.log(Math.min(smax, Math.max(smin, v)) / smin) / Math.log(smax / smin);
+  parGeo = { X, Y };
+  ctx.strokeStyle = theme.line; ctx.lineWidth = 1; ctx.fillStyle = theme['ink-3'];
+  [0.1, 0.3, 1, 3, 10, 30, 100].forEach(v => { const y = Math.round(Y(v)) + 0.5; ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(w - R, y); ctx.stroke(); ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillText(v + '%', L - 6, y); });
+  [1, 2, 3, 5, 10, 20, 30, 50, 100, 200].filter(v => v >= tmin && v <= tmax).forEach(v => { ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText(v + ' s', X(v), h - B + 6); });
+  ctx.textAlign = 'center'; ctx.fillText('time per transfer (log)', (L + w - R) / 2, h - 14);
+  // budget line
+  const b = +$('#budget').value;
+  ctx.strokeStyle = theme['ink-2']; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(L, Y(b)); ctx.lineTo(w - R, Y(b)); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = alpha(theme['ink-3'].startsWith('#') ? theme['ink-3'] : '#7c8996', 0.45);
+  pts.forEach(q => { ctx.beginPath(); ctx.arc(X(q.time), Y(q.score), 2.6, 0, 7); ctx.fill(); });
+  const sorted = [...pts].sort((a, c) => a.time - c.time); front = []; let m = Infinity;
+  for (const q of sorted) if (q.score < m) { m = q.score; front.push(q); }
+  ctx.strokeStyle = theme['series-1']; ctx.lineWidth = 2; ctx.beginPath();
+  front.forEach((q, k) => { const xx = X(q.time), yy = Y(q.score); if (!k) ctx.moveTo(xx, yy); else { ctx.lineTo(xx, Y(front[k - 1].score)); ctx.lineTo(xx, yy); } }); ctx.stroke();
+  front.forEach(q => { ctx.fillStyle = theme['series-1']; ctx.strokeStyle = theme.panel; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(X(q.time), Y(q.score), 4.5, 0, 7); ctx.fill(); ctx.stroke(); });
+  if (cur) { ctx.strokeStyle = theme.ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(X(Math.min(tmax, Math.max(tmin, cur.time))), Y(cur.score), 7, 0, 7); ctx.stroke(); }
+  if (parHover >= 0) {
+    const q = pts[parHover], p = q.p, xx = X(q.time), yy = Y(q.score);
+    ctx.strokeStyle = theme.ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(xx, yy, 5, 0, 7); ctx.stroke();
+    tipBox(ctx, xx, yy, [`${q.time.toFixed(1)} s · total ${q.score.toFixed(2)}%`, `bias ${q.err.toFixed(2)}% · CV ${q.cv.toFixed(2)}%`, `asp ${Math.round(p.qa)} µL/s, wait ${p.tad.toFixed(1)} s`, `disp ${Math.round(p.qd)} µL/s, wait ${p.tdd.toFixed(1)} s`, `blow ${Math.round(p.vbo)} µL @ ${Math.round(p.qbo)} µL/s`], w, h);
+  }
+}
+cvPar.addEventListener('pointermove', ev => {
+  if (!parGeo) return;
+  const r = cvPar.getBoundingClientRect(), mx = ev.clientX - r.left, my = ev.clientY - r.top;
+  let bi = -1, bd = 196;
+  pts.forEach((q, k) => { const d = (parGeo.X(q.time) - mx) ** 2 + (parGeo.Y(q.score) - my) ** 2; if (d < bd) { bd = d; bi = k; } });
+  if (bi !== parHover) { parHover = bi; drawPareto(); }
+});
+cvPar.addEventListener('pointerleave', () => { parHover = -1; drawPareto(); });
+cvPar.addEventListener('click', () => { if (parHover >= 0) { setParams(pts[parHover].p); parHover = -1; onChange(false); setView('sim'); play(); } });
+
+const RAMP = ['#cde2fb', '#b7d3f6', '#9ec5f4', '#86b6ef', '#6da7ec', '#5598e7', '#3987e5', '#2a78d6', '#256abf', '#1c5cab', '#184f95', '#104281', '#0d366b'];
+// Color scale follows this map's own range so flat maps still show structure.
+let SLO = 0.3, SHI = 60;
+const rampAt = v => RAMP[Math.max(0, Math.min(RAMP.length - 1, Math.floor(Math.log(Math.max(v, SLO) / SLO) / Math.log(SHI / SLO) * RAMP.length)))];
+const cvHeat = $('#cv-heat');
+let heatGeo = null, heatHover = null;
+function drawHeat() {
+  const { ctx, w, h } = fit(cvHeat);
+  ctx.font = '11px "IBM Plex Sans", sans-serif';
+  if (!grid) { ctx.fillStyle = theme['ink-3']; ctx.textAlign = 'center'; ctx.fillText('Computing…', w / 2, h / 2); heatGeo = null; return; }
+  const G = grid.G, L = 58, R = 16, T = 12, B = 64;
+  const side = Math.max(60, Math.min(w - L - R, h - T - B));
+  const ox = L + (w - L - R - side) / 2, cs = side / G;
+  heatGeo = { ox, oy: T, cs, G };
+  SLO = Math.max(0.05, Math.min(...grid.vals)); SHI = Math.max(SLO * 1.2, Math.max(...grid.vals));
+  for (let a = 0; a < G; a++) for (let d = 0; d < G; d++) {
+    ctx.fillStyle = rampAt(grid.vals[d * G + a]);
+    ctx.fillRect(ox + a * cs, T + (G - 1 - d) * cs, Math.ceil(cs) - 1, Math.ceil(cs) - 1);
+  }
+  // best cell
+  let bi = 0; grid.vals.forEach((v, k) => { if (v < grid.vals[bi]) bi = k; });
+  const ba = bi % G, bd = Math.floor(bi / G);
+  ctx.strokeStyle = theme.panel; ctx.lineWidth = 2; ctx.strokeRect(ox + ba * cs - 1, T + (G - 1 - bd) * cs - 1, cs + 1, cs + 1);
+  ctx.strokeStyle = theme.ink; ctx.lineWidth = 1; ctx.strokeRect(ox + ba * cs - 2.5, T + (G - 1 - bd) * cs - 2.5, cs + 4, cs + 4);
+  // current setting marker
+  const fa = Math.log(S.qa / 5) / Math.log(120), fd = Math.log(S.qd / 5) / Math.log(160);
+  const cx = ox + fa * (G - 1) * cs + cs / 2, cy = T + (1 - fd) * (G - 1) * cs + cs / 2;
+  ctx.strokeStyle = theme.ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, cy, 6, 0, 7); ctx.stroke();
+  // axes
+  ctx.fillStyle = theme['ink-3'];
+  [5, 10, 30, 100, 300, 600].forEach(v => { const f = Math.log(v / 5) / Math.log(120); ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText(v, ox + f * (G - 1) * cs + cs / 2, T + side + 5); });
+  [5, 10, 30, 100, 300, 800].forEach(v => { const f = Math.log(v / 5) / Math.log(160); ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillText(v, ox - 6, T + (1 - f) * (G - 1) * cs + cs / 2); });
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText('aspirate rate, µL/s', ox + side / 2, T + side + 20);
+  ctx.save(); ctx.translate(ox - 40, T + side / 2); ctx.rotate(-Math.PI / 2); ctx.fillText('dispense rate, µL/s', 0, 0); ctx.restore();
+  // color scale
+  const lw = Math.min(220, side), lx = ox + (side - lw) / 2, ly = T + side + 40;
+  RAMP.forEach((c, k) => { ctx.fillStyle = c; ctx.fillRect(lx + k * lw / RAMP.length, ly, lw / RAMP.length + 0.5, 8); });
+  ctx.fillStyle = theme['ink-3']; ctx.textBaseline = 'middle';
+  ctx.textAlign = 'right'; ctx.fillText(fnum(SLO) + '%', lx - 6, ly + 4);
+  ctx.textAlign = 'left'; ctx.fillText(fnum(SHI) + '% total error', lx + lw + 6, ly + 4);
+  if (heatHover) {
+    const { a, d } = heatHover, v = grid.vals[d * G + a];
+    const qa = 5 * Math.pow(120, a / (G - 1)), qd = 5 * Math.pow(160, d / (G - 1));
+    const xx = ox + a * cs + cs / 2, yy = T + (G - 1 - d) * cs + cs / 2;
+    ctx.strokeStyle = theme.ink; ctx.lineWidth = 1.5; ctx.strokeRect(ox + a * cs - 0.5, T + (G - 1 - d) * cs - 0.5, cs, cs);
+    tipBox(ctx, xx, yy, [`total error ${v.toFixed(2)}%`, `aspirate ${Math.round(qa)} µL/s`, `dispense ${Math.round(qd)} µL/s`], w, h);
+  }
+}
+const heatCell = ev => {
+  if (!heatGeo) return null;
+  const r = cvHeat.getBoundingClientRect(), { ox, oy, cs, G } = heatGeo;
+  const a = Math.floor((ev.clientX - r.left - ox) / cs), dd = G - 1 - Math.floor((ev.clientY - r.top - oy) / cs);
+  return a >= 0 && a < G && dd >= 0 && dd < G ? { a, d: dd } : null;
+};
+cvHeat.addEventListener('pointermove', ev => { const c = heatCell(ev); if (JSON.stringify(c) !== JSON.stringify(heatHover)) { heatHover = c; drawHeat(); } });
+cvHeat.addEventListener('pointerleave', () => { heatHover = null; drawHeat(); });
+cvHeat.addEventListener('click', ev => {
+  const c = heatCell(ev); if (!c) return; const G = heatGeo.G;
+  setParams({ qa: 5 * Math.pow(120, c.a / (G - 1)), qd: 5 * Math.pow(160, c.d / (G - 1)) });
+  onChange(false); drawHeat(); drawPareto();
+});
+
+// ---------- views ----------
+let view = 'sim';
+function setView(v) {
+  view = v;
+  for (const [k, id] of [['sim', 't-sim'], ['opt', 't-opt'], ['model', 't-model']]) {
+    $('#' + id).setAttribute('aria-selected', k === v);
+    $('#v-' + k).hidden = k !== v;
+  }
+  $('#body').classList.toggle('full', v === 'model');
+  try { localStorage.setItem('lcb.view', v); } catch (e) {}
+  if (v === 'opt') runOpt();
+  if (v === 'sim') drawAll();
+}
+$('#t-sim').addEventListener('click', () => setView('sim'));
+$('#t-opt').addEventListener('click', () => setView('opt'));
+$('#t-model').addEventListener('click', () => setView('model'));
+
+const redraw = () => { readTheme(); paintSwatches(); if (view === 'sim') drawAll(); if (view === 'opt') { drawPareto(); drawHeat(); } };
+new ResizeObserver(redraw).observe(document.querySelector('main'));
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redraw);
+new MutationObserver(redraw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+function setGuide(on) {
+  guide = on; capKey = '';
+  document.body.classList.toggle('guide', on);
+  $('#guide').setAttribute('aria-pressed', on);
+  try { localStorage.setItem('lcb.guide', on ? '1' : '0'); } catch (e) {}
+  if (cur) { renderOutputs(); redraw(); }
+}
+$('#guide').addEventListener('click', () => setGuide(!guide));
+let g0 = true;
+try { const g = localStorage.getItem('lcb.guide'); if (g != null) g0 = g === '1'; } catch (e) {}
+setGuide(g0);
+
+readTheme(); paintSwatches(); runSim(); renderOutputs(); tNow = cur.trace.tEnd; drawAll();
+document.fonts && document.fonts.ready.then(redraw);
+if (!matchMedia('(prefers-reduced-motion: reduce)').matches) play();
+})();
+</script>
+</body>
+</html>
