@@ -39,6 +39,10 @@ body { background: var(--bg); color: var(--ink); font-family: var(--f-body); fon
 }
 .brand { font-family: var(--f-display); font-weight: 600; font-size: 19px; letter-spacing: 0.01em; }
 .brand small { font-family: var(--f-body); font-weight: 400; font-size: 12px; color: var(--ink-3); margin-left: 8px; letter-spacing: 0; }
+.badge {
+  margin-left: 10px; font: 600 11px var(--f-body); letter-spacing: 0.02em; color: var(--warn);
+  border: 1px solid currentColor; border-radius: 99px; padding: 2px 8px; vertical-align: 3px; white-space: nowrap;
+}
 .tabs { display: flex; gap: 4px; }
 .tab {
   font: 500 13px var(--f-body); color: var(--ink-2); background: none; border: 1px solid transparent;
@@ -178,7 +182,7 @@ main { min-height: 0; min-width: 0; overflow: auto; }
 <body>
 <div class="app">
   <header class="top">
-    <div class="brand">Liquid Class Bench<small>P200 air-displacement channel, simulated</small></div>
+    <div class="brand">Liquid Class Bench<small>simulated P200 pipette</small><span class="badge">Demo · in development</span></div>
     <nav class="tabs" role="tablist">
       <button class="tab" role="tab" id="t-sim" aria-selected="true">Simulate</button>
       <button class="tab" role="tab" id="t-opt" aria-selected="false">Optimize</button>
@@ -188,11 +192,11 @@ main { min-height: 0; min-width: 0; overflow: auto; }
   </header>
   <div class="body" id="body">
     <aside class="side" id="side">
-      <div class="grp"><h3>Liquid</h3><p class="gd">Higher viscosity (cP) means the liquid follows the piston more slowly.</p><div class="liqs" id="liqs"></div></div>
+      <div class="grp"><h3>Liquid</h3><p class="gd">Higher cP follows the piston more slowly.</p><div class="liqs" id="liqs"></div></div>
       <div class="grp"><h3>Transfer</h3><div id="g-transfer"></div></div>
-      <div class="grp"><h3>Aspirate</h3><p class="gd">Piston pulls air and liquid follows with a lag. The delay lets it catch up before the tip leaves.</p><div id="g-Aspirate"></div></div>
-      <div class="grp"><h3>Dispense</h3><p class="gd">Fast gives a clean jet but can strip a film onto the wall. The delay lets that film drain.</p><div id="g-Dispense"></div></div>
-      <div class="grp"><h3>Blowout</h3><p class="gd">Extra air pushed after the liquid to knock off the last drop.</p><div id="g-Blowout"></div></div>
+      <div class="grp"><h3>Aspirate</h3><p class="gd">Liquid lags the piston. Delay lets it catch up.</p><div id="g-Aspirate"></div></div>
+      <div class="grp"><h3>Dispense</h3><p class="gd">Fast can leave film on the wall. Delay lets it drain.</p><div id="g-Dispense"></div></div>
+      <div class="grp"><h3>Blowout</h3><p class="gd">Air push that clears the last drop.</p><div id="g-Blowout"></div></div>
     </aside>
     <main>
       <section class="view" id="v-sim">
@@ -206,21 +210,21 @@ main { min-height: 0; min-width: 0; overflow: auto; }
         </div>
         <div class="right">
           <div class="tiles">
-            <div class="card tile"><div class="k">Delivered</div><div class="v" id="o-del"></div><div class="s" id="o-del-s"></div><p class="gd">What lands in the well.</p></div>
-            <div class="card tile"><div class="k">Bias</div><div class="v" id="o-err"></div><div class="s" id="o-chip"></div><p class="gd">Average miss. Negative is short.</p></div>
-            <div class="card tile"><div class="k">CV</div><div class="v" id="o-cv"></div><div class="s">expected over repeats</div><p class="gd">Scatter between shots (estimated).</p></div>
-            <div class="card tile"><div class="k">Time</div><div class="v" id="o-time"></div><div class="s">per transfer</div><p class="gd">Aspirate through lift.</p></div>
+            <div class="card tile"><div class="k">Delivered</div><div class="v" id="o-del"></div><div class="s" id="o-del-s"></div></div>
+            <div class="card tile"><div class="k">Bias</div><div class="v" id="o-err"></div><div class="s" id="o-chip"></div></div>
+            <div class="card tile"><div class="k">CV</div><div class="v" id="o-cv"></div><div class="s">shot to shot, estimated</div></div>
+            <div class="card tile"><div class="k">Time</div><div class="v" id="o-time"></div><div class="s">per transfer</div></div>
           </div>
           <div class="card traces">
             <div class="card-h"><h2>Channel pressure and tip contents</h2>
               <div class="legend"><span><i style="color:var(--series-1)"></i>Air-gap pressure</span><span><i id="lg-liq"></i>Liquid in tip</span><span><i class="dash" style="color:var(--ink-2)"></i>Piston stroke</span></div>
             </div>
-            <p class="gd gd-n">Top: pressure in the air gap above the liquid; below zero is suction. Bottom: the piston moves first and the liquid follows, so the gap between the lines is lag. Drag across the chart to scrub.</p>
+            <p class="gd gd-n">Below zero is suction. The gap between stroke and liquid is lag. Drag to scrub.</p>
             <canvas id="cv-trace" aria-label="Pressure and volume traces over the transfer"></canvas>
           </div>
           <div class="card">
             <div class="card-h"><h2>Where the error comes from</h2><span>µL vs target</span></div>
-            <p class="gd gd-n">Each row is one way volume goes missing. Gray bars lose volume, blue bars add it.</p>
+            <p class="gd gd-n">Gray bars lose volume, blue bars add it.</p>
             <div class="bk" id="bk"></div>
           </div>
         </div>
@@ -232,23 +236,19 @@ main { min-height: 0; min-width: 0; overflow: auto; }
           <select id="budget"><option value="0.5">0.5%</option><option value="1" selected>1%</option><option value="2">2%</option><option value="5">5%</option><option value="10">10%</option></select>
           <span class="res" id="pick-res"></span>
           <button class="btn" id="pick-load" disabled>Load and play</button>
-          <span class="st" id="opt-st"></span>
-          <p class="gd">The search simulates 700 random liquid classes for this liquid and volume, then picks the fastest one inside your error budget.</p>
-        </div>
+          <span class="st" id="opt-st"></span>        </div>
         <div class="opt-grid">
           <div class="card">
             <div class="card-h"><h2>Speed vs accuracy</h2>
               <div class="legend"><span><i class="dot" style="background:var(--ink-3)"></i>Sampled setting</span><span><i class="dot" style="background:var(--series-1)"></i>Pareto front</span><span><i class="ring" style="color:var(--ink)"></i>Current</span></div>
             </div>
-            <p class="gd gd-n">Each dot is one simulated liquid class. Left is faster and lower is more accurate. The blue staircase marks the best accuracy you can get at each speed.</p>
+            <p class="gd gd-n">Each dot is one setting. Left is faster, lower is more accurate.</p>
             <canvas id="cv-pareto" aria-label="Scatter of transfer time against total error"></canvas>
             <div class="card-f legend"><span>Total error = |bias| + 2·CV. Click a point to load it.</span></div>
           </div>
           <div class="card">
-            <div class="card-h"><h2>Aspirate rate × dispense rate</h2><span>other settings from the sidebar</span></div>
-            <p class="gd gd-n">Only the two rates change here. The box marks the best pair and the ring marks your current pair.</p>
-            <canvas id="cv-heat" aria-label="Heatmap of total error over aspirate and dispense rates"></canvas>
-            <div class="card-f legend"><span>Lighter is more accurate. Click a cell to use its rates.</span></div>
+            <div class="card-h"><h2>Aspirate rate × dispense rate</h2><span>other settings from the sidebar</span></div>            <canvas id="cv-heat" aria-label="Heatmap of total error over aspirate and dispense rates"></canvas>
+            <div class="card-f legend"><span>Lighter is more accurate. Box: best. Ring: current. Click to use.</span></div>
           </div>
         </div>
       </section>
@@ -256,14 +256,14 @@ main { min-height: 0; min-width: 0; overflow: auto; }
       <section class="view" id="v-model" hidden>
         <div class="doc">
           <h2>What the simulator computes</h2>
-          <p>One transfer through a single air-displacement channel with a conical 200 µL tip: aspirate from a reservoir, move 1 s, free-dispense into a well, blow out, lift. The liquid column is a lumped plug pushed by an isothermal air spring. Each run takes a few milliseconds, so the optimizer can try hundreds of liquid classes in a second or two.</p>
+          <p>One transfer through an air-displacement channel with a conical 200 µL tip. The liquid is a lumped plug pushed by an air spring. A run takes a few milliseconds.</p>
           <h3>Column dynamics</h3>
           <div class="eq">ρ·I(h)·dQ/dt = P_out − P_air − ρ·g·h + 2σ·cosθ / r(h) − [ R(h) + ½ρ|Q| / A₀² ]·Q
 
 P_air = n / V_air                         isothermal air gap (150 µL channel + tip)
 R(h)  = 8μ/(3πk)·(r₀⁻³ − r(h)⁻³) + 3μ/r₀³   Poiseuille in the cone + Sampson orifice term
 I(h)  = (1/πk)·(1/r₀ − 1/r(h)) + 2/(πr₀)     inertance of the column</div>
-          <p>The piston stroke includes a static correction for the column weight, like the correction curve in a real liquid class. What is left is dynamic error, which is what speeds, delays and blowout control.</p>
+          <p>The stroke is pre-corrected for the column weight, so the remaining error is dynamic: what rates, delays and blowout control.</p>
           <h3>Loss mechanisms</h3>
           <div class="tbl"><table>
             <thead><tr><th>Mechanism</th><th>Model</th><th>Main controls</th></tr></thead>
@@ -279,9 +279,9 @@ I(h)  = (1/πk)·(1/r₀ − 1/r(h)) + 2/(πr₀)     inertance of the column</d
             </tbody>
           </table></div>
           <h3>Limits</h3>
-          <p>Coefficients come from textbook scaling laws and typical polypropylene contact angles, not from a calibrated instrument. Use the results for intuition and as a cheap prior for real gravimetric tuning, not as settings to copy to a robot. Volatile liquids, foaming, non-Newtonian samples and contact dispense are out of scope.</p>
+          <p>Demo in development. Coefficients come from textbook scaling laws, not a calibrated instrument: use the trends, not the numbers. Volatile, foaming and non-Newtonian liquids are out of scope.</p>
           <h3>Related</h3>
-          <p><a href="https://pubs.rsc.org/en/content/articlehtml/2024/dd/d3dd00255a" target="_blank" rel="noopener">Multi-objective Bayesian optimization of viscous liquid handling (Digital Discovery, 2024)</a> tunes the same rates on real hardware with a balance. <a href="https://docs.opentrons.com/v2/liquid_classes.html" target="_blank" rel="noopener">Opentrons liquid classes</a> and Hamilton liquid classes expose the same parameters on real instruments.</p>
+          <p><a href="https://pubs.rsc.org/en/content/articlehtml/2024/dd/d3dd00255a" target="_blank" rel="noopener">Bayesian optimization of viscous liquid handling (Digital Discovery, 2024)</a> · <a href="https://docs.opentrons.com/v2/liquid_classes.html" target="_blank" rel="noopener">Opentrons liquid classes</a></p>
         </div>
       </section>
     </main>
@@ -610,13 +610,13 @@ function caption(pi) {
   const P = cur.parts, u = v => `${v.toFixed(1)} µL`, thick = LIQ[S.liq].mu > 0.02;
   const net = cur.delivered - S.V;
   return [
-    ['Aspirate', `The piston rises and the air gap goes into suction, pulling liquid up the tip. ${thick ? 'This thick liquid trails well behind the piston.' : 'A thin liquid keeps up almost at once.'}`],
-    ['Delay', `The tip waits in the source while the column catches up. ${P.lag > 0.05 ? `It is still ${u(P.lag)} short when the tip leaves.` : 'It is fully caught up before the tip leaves.'}`],
-    ['Move', `The tip travels to the destination. ${P.drip > 0.05 ? `${u(P.drip)} drips out on the way.` : 'Surface tension holds the column in.'}`],
-    ['Dispense', `The piston pushes down and the liquid leaves ${cur.WeT > 4 ? 'as a jet' : 'drop by drop'}. ${P.film > 0.05 ? `The meniscus moves faster than the liquid can let go of the wall, so a film stays behind (${u(P.film)} by the end).` : 'The meniscus moves slowly enough that the wall stays clean.'}`],
-    ['Delay', `The tip waits so the wall film can drain down and out. ${cur.hangRaw > 0.05 ? `A ${u(cur.hangRaw)} drop hangs on the tip end.` : ''}`],
-    ['Blowout', `A puff of air knocks off the drop and the leftover liquid at the tip end. About ${Math.round(cur.clearFrac * 100)}% of it is cleared.`],
-    ['Lift', `The tip withdraws, and anything still on it is lost. Net result: ${net >= 0 ? '+' : '−'}${Math.abs(net).toFixed(2)} µL against the target.`],
+    ['Aspirate', `Suction pulls liquid up. ${thick ? 'This liquid lags well behind the piston.' : 'This liquid keeps up.'}`],
+    ['Delay', `Column catches up. ${P.lag > 0.05 ? `Still ${u(P.lag)} short when the tip leaves.` : 'Fully caught up.'}`],
+    ['Move', P.drip > 0.05 ? `${u(P.drip)} drips out on the way.` : 'Surface tension holds the column.'],
+    ['Dispense', `Leaves ${cur.WeT > 4 ? 'as a jet' : 'drop by drop'}. ${P.film > 0.05 ? `Too fast for the wall to dewet: ${u(P.film)} film left.` : 'Wall stays clean.'}`],
+    ['Delay', `Film drains down. ${cur.hangRaw > 0.05 ? `A ${u(cur.hangRaw)} drop hangs on the tip.` : ''}`],
+    ['Blowout', `Air knocks off the last drop (${Math.round(cur.clearFrac * 100)}% cleared).`],
+    ['Lift', `Net ${net >= 0 ? '+' : '−'}${Math.abs(net).toFixed(2)} µL against the target.`],
   ][pi];
 }
 const idxAt = t => {
@@ -637,14 +637,14 @@ function renderOutputs() {
   const icon = cls === 'good' ? '✓' : cls === 'warn' ? '!' : '✕';
   $('#o-chip').innerHTML = `<span class="chip ${cls}">${icon} total error ${sc < 10 ? sc.toFixed(1) : Math.round(sc)}%</span>`;
   const rows = [
-    ['lag', 'Not drawn in yet', 'Liquid still flowing into the tip when it left the source'],
-    ['bub', 'Degassing bubbles', 'Strong suction pulled gas out of solution'],
-    ['drip', 'Dripped in transit', 'Column slipped when the reservoir support went away'],
-    ['film', 'Wall film', 'Liquid left coating the inside of the tip'],
-    ['residual', 'Left in tip', 'Column had not finished leaving when the tip lifted'],
-    ['hang', 'Hanging drop', 'Drop stuck to the tip end'],
-    ['splash', 'Splash / spray', 'Jet splash or blowout spray outside the well'],
-    ['cling', 'Outside cling', 'Film on the outer wall that drained into the well (adds volume)'],
+    ['lag', 'Not drawn in yet', 'Still flowing in when the tip left'],
+    ['bub', 'Degassing bubbles', 'Suction pulled gas out of solution'],
+    ['drip', 'Dripped in transit', 'Column slipped during the move'],
+    ['film', 'Wall film', 'Left coating the inside wall'],
+    ['residual', 'Left in tip', 'Still in the tip at lift'],
+    ['hang', 'Hanging drop', 'Stuck to the tip end'],
+    ['splash', 'Splash / spray', 'Landed outside the well'],
+    ['cling', 'Outside cling', 'Outer-wall film that drained in'],
   ];
   const mx = Math.max(1, ...rows.map(([k]) => Math.abs(r.parts[k])));
   let h = '';
